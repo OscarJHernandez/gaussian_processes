@@ -6,8 +6,9 @@
 #------------------------------------------------------------------------
 
 import numpy as np
-from numpy.linalg import inv
+from numpy.linalg import inv, det
 from scipy import stats
+from scipy.optimize import minimize
 
 class guassian_process:
     
@@ -63,8 +64,60 @@ class guassian_process:
             for j in range(i,self.N):
                 xi = self.x[i]
                 xj = self.x[j]
+                # sigf,sig0,l
                 self.K[i][j] = self.RBF(xi,xj,sigf,sig0,l)
                 self.K[j][i] = self.K[i][j] 
+    
+    #
+    # Maximizing the log likelyhood means,  
+    #
+    # The Log likelyhood of the gp process
+    #
+    def gp_log_likelyhood(self,phi_vec):
+        
+                
+        K = np.zeros((self.N,self.N))
+             
+        # Fill in the matrix     
+        for i in range(0,self.N):
+            for j in range(0,self.N):
+                xi = self.x[i]
+                xj = self.x[j]
+                K[i][j] = self.RBF(xi,xj,phi_vec[0],phi_vec[1],phi_vec[2])
+        
+        K_inv = inv(K) # Compute the inverse
+        
+        det_K = det(K) # The determinant of K
+        
+        print phi_vec,det_K
+        
+        
+        log_p = -0.5*np.matmul(self.y,np.matmul(K_inv,self.y.T)) -0.5*np.log(det_K)
+        log_p = log_p - 0.5*self.N*np.log(2.0*np.pi)
+        
+        
+        return log_p
+    
+    
+    #-------------------------------------------------------------------
+    # Optimize the hyperparameters of GP using a simple grid search
+    #-------------------------------------------------------------------
+    def optimize_grid_search(self):
+        
+        # sigf,sig0,l
+        x0 = [1.0,1.0,1.0]
+        
+        res = minimize(self.gp_log_likelyhood, x0, method='Nelder-Mead', tol=1e-6)
+        
+        # Reinitialize Kernels
+        self.sigf = res.x[0]
+        self.sig0 = res.x[1]
+        self.l = res.x[2]
+        
+        self.init_Kernel()
+        
+        
+        return res.x
     
     
     #-------------------------------------------------------------------
